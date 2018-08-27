@@ -1,0 +1,258 @@
+﻿<html id="drop_zone" title="click to shuffle" onclick="shuffle()">
+<head>
+<title>Mischa</title>
+<meta name="author"	content="Axel Scheithauer"/>
+<meta name="date"	content="2017/02/23"/>
+<meta name="description" content="Einteilung von Teilnehmern in Gruppen"/>
+
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<script>
+function help(){
+alert("Anleitung\n\n"+
+
+"Einteilung von Teilnehmern in Gruppen.\n"+
+"Aufruf mit Parametern:\n\n"+
+"/mischa.html?groups=3&names=Axel Schi,Andrea Gra,Marcus Win,Michael Hof,Tim Weil,Stephan Ro\n\n"+
+
+"Bei Aufruf ohne Parameter werden die zwischengespeicherten früher verwendeten Parameter genutzt.\n"+
+"Eine Textdatei mit einer Liste von Namen kann per Drag-n-Drop oder über einen Dateiauswahldialog zugewiesen werden.\n"+
+"Eine Neueinteilung kann einfach durch Klicken irgendwo im Fenster oder durch Neuladen der Seite ausgelöst werden.\n"+
+"Durch den Zurückknopf können vergangene Verteilungen wiederhergestellt werden.");
+};
+</script>
+
+<style>
+body {text-align: center;}
+h1 {margin-bottom:6pt; padding-bottom:4pt;background-color:lightyellow;}
+p {margin:0; font-size:16pt;}
+.menu {float:left; margin-top:24pt;}
+input {text-align:right; float:right; margin-top:24pt;}
+input[type='checkbox']{float:left;margin-top:4pt;}
+input+span{color:lightgrey;}
+input:checked+span{color:black;}
+</style>
+</head>
+<body>
+<div id="groupedList">
+</div>
+<span class='menu'>
+	<button id="help_button" title="Hilfe" >?</button>&nbsp;
+</span>
+<span class='menu' id="groupButtons">
+	<button groups=2 title="zwei Gruppen">&#8226;&#8226;</button>
+	<button groups=3 title="drei Gruppen">&#8226;&#8226;&#8226;</button>
+	<button groups=4 title="vier Gruppen">&#8226;&#8226;&#8226;&#8226;</button>
+	<button groups=5 title="fünf Gruppen">&#8226;&#8226;&#8226;&#8226;&#8226;</button>
+</span>
+<input type="file" id="files" title="drop file with names here" name="file1" />
+<script>
+var dirty=false;
+function getParameterByName(name) {
+    url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2]);
+};
+function getNoOfGroups(){
+  result=getParameterByName("groups");
+  if (!result) {result=localStorage.noOfGroups};
+  if (!result) {result=3};
+  return result; 
+}
+function getNames(){
+// lese Namen von den URL-Parametern und speichere sie lokal. Ohne Parameter lese die lokal gespeicherten Namen 
+	theNames=getParameterByName("names");
+	if (theNames) {
+		theNames='\["'+theNames.replace(/\,/g,'","')+'"\]';
+		localStorage.setItem("names",theNames);
+		theNames=JSON.parse(theNames);};
+	if (!theNames){theNames=JSON.parse(localStorage.names);};
+	return theNames;
+}
+function getNamesFromDocument(){
+	var namesList=document.getElementsByClassName('nameValue');
+	var result=[];
+	for (n of namesList){
+		if (n.childNodes[0].checked){prefix=''}else {prefix='-'}; 
+		result.push(prefix+n.childNodes[1].innerHTML);
+	};
+	return result;
+};
+function getAnwesend(theNames){
+	result=[]; 
+	for (n of theNames){
+		if (n[0]!='-'){result.push(n);}
+	};
+	return result;
+};
+function getAbwesend(theNames){
+	result=[];
+	for (n of theNames){
+		if (n[0]=='-'){result.push(n.slice(1));}
+	};
+	return result;
+}
+function getNamepart(aName){
+	if (aName[0]=='-') {return aName.slice(1)} else {return aName}
+}
+function getList(theNoOfGroups,theNames){
+	anwesendNames=getAnwesend(theNames);
+	nameIndex=0;
+	var result='';
+	for (j=0;j<theNoOfGroups ;j++){
+		result+="<h1>Gruppe "+(j+1)+"</h1>";
+		remainingNames=anwesendNames.length-nameIndex;
+		remainingGroups=theNoOfGroups-j;
+		noOfNamesPerGroup=Math.ceil(remainingNames/remainingGroups);
+		for (i=0;i<noOfNamesPerGroup;i++){
+			result+="<p class='anwesend nameSlot'><span class='nameValue'><input type='checkbox' title='anwesend' checked/><span >"+anwesendNames[nameIndex]+"</span></span></p>";
+			nameIndex++;
+		};
+	};
+	abwesendNames=getAbwesend(theNames);
+	if (abwesendNames.length>0){
+		result+="<h1>Abwesend</h1>"
+		for (n of abwesendNames){
+			result+="<p class='abwesend nameSlot'><span class='nameValue'><input type='checkbox' title='abwesend' /><span >"+getNamepart(n)+"</span></span></p>";
+		};
+	};
+	return result;
+};
+function renderList(){
+	document.getElementById('groupedList').innerHTML=getList(getNoOfGroups(),getNames());
+};
+function swap(e1,e2){
+var e1_old;
+e1_old=e1.childNodes[0];
+e1.appendChild(e2.childNodes[0]);
+e2.appendChild(e1_old);
+};
+function shuffle(){
+	if (dirty){
+		document.getElementById('groupedList').innerHTML=getList(getNoOfGroups(),getNamesFromDocument());
+		dirty=false;
+	};
+	var m = 0, i;
+	var namesList=document.getElementsByClassName('anwesend');
+	var interval1 = setInterval(function(){
+		  // While there remain elements to shuffle…
+		if (m<namesList.length-1) {
+			// Pick a remaining element…
+			i = m + Math.floor(Math.random() * (namesList.length-m));
+			swap(namesList[m],namesList[i]);
+			m+=1;
+		}
+		else {
+			clearInterval(interval1);
+			pushState(getNoOfGroups(),getNamesFromDocument());
+		};
+	},100);
+};
+function pushState(noOfGroups, names){
+	localStorage.setItem("noOfGroups",noOfGroups);
+	localStorage.setItem("names",JSON.stringify(names));
+	history.pushState({},"pushed","?groups="+noOfGroups+"&names="+names);
+}
+function normalizedNameString(newNameString){
+// JSON or character separated list. Allowed separators: , ; | LF CRLF Tab
+	function removeTrailingComma(aString){
+	// it would look like this: "name","
+	// therefore two letters have to be removed
+		if (aString[aString.length-2]==",")
+			{return aString.slice(0,aString.length-3)}
+		else
+			{return aString}
+	}
+	if (newNameString[0]=="["){
+		return JSON.parse(newNameString);}
+	else {
+		return JSON.parse('\["'+removeTrailingComma(newNameString.replace(/(\r\n|\n|\;|\||\t)+/g,'","'))+'"\]');
+	}
+}
+function replaceNames(newNameString){
+	names=normalizedNameString(newNameString);
+	pushState(getNoOfGroups(),names);
+	renderList();
+}
+function replaceNamesFromFile(afile){
+	r = new FileReader();
+	var theNames;
+	r.onload = function(){
+		theNames = r.result;
+		replaceNames(theNames);
+	};	
+	r.readAsText(afile);
+}
+function handleFileSelect(evt){
+	evt.stopPropagation();
+	evt.preventDefault();
+	replaceNamesFromFile(evt.target.files[0]);
+};
+function handleDragOver(evt) {
+	evt.stopPropagation();
+	evt.preventDefault();
+	evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+};
+function handleDrop(evt) {
+	evt.stopPropagation();
+	evt.preventDefault();
+	if (evt.dataTransfer.files.length>0){
+		replaceNamesFromFile(evt.dataTransfer.files[0])
+	};
+	theText=evt.dataTransfer.getData('Text');
+	if (theText.length>0){
+		replaceNames(theText)
+	}
+}
+function handleHelp(evt){
+	evt.stopPropagation();
+	evt.preventDefault();
+	help();
+};
+function handleGroupChange(evt){
+    if (evt.target.tagName.toLowerCase() == 'button') {
+		evt.stopPropagation();
+		evt.preventDefault();
+		noOfGroups=evt.target.getAttribute('groups');
+		if (noOfGroups!=getNoOfGroups()){
+			pushState(noOfGroups,getNamesFromDocument());
+			renderList();
+		}
+    }
+};
+function handlePopState(evt){
+	renderList();
+};
+function handleCheckbox(evt){
+	if (evt.target.type=='checkbox'){
+		evt.stopPropagation();
+		dirty=true;
+		pushState( getNoOfGroups(),getNamesFromDocument());
+		//evt.preventDefault();
+	};
+};
+
+document.getElementById('help_button').addEventListener('click',handleHelp,false);
+document.getElementById('files').addEventListener('change',handleFileSelect,false);
+document.getElementById('drop_zone').addEventListener( 'dragover', handleDragOver, false);
+document.getElementById('drop_zone').addEventListener('drop', handleDrop, false);
+document.getElementById('groupButtons').addEventListener('click', handleGroupChange, false);
+document.getElementById('groupedList').addEventListener('click', handleCheckbox, false);
+window.addEventListener('popstate',handlePopState);
+
+renderList();
+if (history.state) {
+	//nur verwürfeln, wenn die aktuelle Reihenfolge einmal angezeigt wurde
+	shuffle()
+}
+else {
+	history.replaceState({},"new Groups","?groups="+getNoOfGroups()+"&names="+getNames());
+};
+</script>
+</body>
+</html>
